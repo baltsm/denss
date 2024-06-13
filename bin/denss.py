@@ -31,7 +31,6 @@ import saxstats.denssopts as dopts
 import numpy as np
 import sys, argparse, os
 import logging
-import saxstats.saxstats_maija_2 as maija   
 
 parser = argparse.ArgumentParser(description="DENSS: DENsity from Solution Scattering.\n A tool for calculating an electron density map from solution scattering data", formatter_class=argparse.RawTextHelpFormatter)
 args = dopts.parse_arguments(parser)
@@ -61,7 +60,7 @@ if __name__ == "__main__":
     my_logger.info('Output prefix: %s', args.output)
     my_logger.info('Mode: %s', args.mode)
 
-    qdata, Idata, sigqdata, qbinsc, Imean, chis, rg, supportV, rho, side, fit, final_chi2 = maija.denss(
+    qdata, Idata, sigqdata, qbinsc, Imean, chis, rg, supportV, rho, side, fit, final_chi2 = saxs.denss(
         q=args.q, #assigning variables
         I=args.I,
         sigq=args.sigq,

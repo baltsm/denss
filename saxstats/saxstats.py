@@ -906,8 +906,7 @@ def check_if_raw_data(Iq):
 def clean_up_data(Iq):
     """Do a quick cleanup by removing zero intensities and zero errors.
 
-    Iq - N x 3 numpy array, where N is the number of data  points, and the
-    three columns are q, I, error.
+ 
     """
     return Iq[(~np.isclose(Iq[:,1],0))&(~np.isclose(Iq[:,2],0))]
 
@@ -1367,7 +1366,6 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         # I3D = myabs(F, DENSS_GPU=DENSS_GPU)**2
         I3D = abs2(F) #calculating intensity (magnitude squared)
         Imean = mybinmean(I3D.ravel(), qblravel, xcount=xcount, DENSS_GPU=DENSS_GPU) #creates profile
-
         #scale Fs to match data
         factors = mysqrt(Idata/Imean, DENSS_GPU=DENSS_GPU)
         #do not scale bins outside of desired range

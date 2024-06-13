@@ -1464,13 +1464,6 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
                 newrho = cp.asnumpy(newrho)
                 support = cp.asnumpy(support)
 
-            if recenter_mode == "two":
-                kmeans_rho = KMeans(n_clusters=2)
-                kmeans_rho.fit(rho)
-
-                rho1 = rho[kmeans_rho.labels_ == 0]
-                rho2 = rho[kmeans_rho.labels_ == 1] 
-        
             #cannot run center_rho_roll() function since we want to also recenter the support
             #perhaps we should fix this in the future to clean it up
             if recenter_mode == "max":
@@ -1495,14 +1488,12 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
 
             if shrinkwrap_old_method:
                 absv = True
-                rho1, support1 = shrinkwrap_by_density_value(rho1,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
-                rho2, support2 = shrinkwrap_by_density_value(rho2,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+                newrho, support = shrinkwrap_by_density_value(newrho,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
             else:
                 swN = int(swV/dV)
                 #end this stage of shrinkwrap when the volume is less than a sphere of radius D/2
                 if swbyvol and swV > swVend:
-                    rho1, support1, threshold1 = shrinkwrap_by_volume(rho1,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
-                    rho2, support2, threshold2 = shrinkwrap_by_volume(rho2,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
+                    newrho, support, threshold = shrinkwrap_by_volume(newrho,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
                     swV *= swV_decay
                 else:
                     threshold = shrinkwrap_threshold_fraction
@@ -1513,8 +1504,8 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
                             else:
                                 print("\nswitched to shrinkwrap by density threshold = %.4f" %threshold)
                         first_time_swdensity = False
-                    rho1, support1 = shrinkwrap_by_density_value(rho1,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
-                    rho2, support2 = shrinkwrap_by_density_value(rho2,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+                    newrho, support = shrinkwrap_by_density_value(newrho,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+
             if sigma > shrinkwrap_sigma_end:
                 sigma = shrinkwrap_sigma_decay*sigma
 
@@ -1534,8 +1525,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
             #get just boundary voxels, i.e. where support=True and eroded=False
             erode_region = np.logical_and(support,~eroded)
             #set all negative density in boundary pixels to zero.
-            rho1[(rho1<0)&(erode_region)] = 0
-            rho2[(rho2<0)&(erode_region)] = 0
+            newrho[(newrho<0)&(erode_region)] = 0
 
             if DENSS_GPU:
                 newrho = cp.array(newrho)
@@ -1549,17 +1539,15 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
             if shrinkwrap_old_method:
                 #run the old method
                 absv = True
-                rho1, support1 = shrinkwrap_by_density_value(rho1,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
-                rho2, support2 = shrinkwrap_by_density_value(rho2,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+                newrho, support = shrinkwrap_by_density_value(newrho,absv=absv,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
             else:
                 #end this stage of shrinkwrap when the volume is less than a sphere of radius D/2
                 swN = int(swV/dV)
                 if swbyvol and swV>swVend:
-                    rho1, support2, threshold2 = shrinkwrap_by_volume(rho1,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
-                    rho2, support2, threshold2 = shrinkwrap_by_volume(rho1,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
+                    newrho, support, threshold = shrinkwrap_by_volume(newrho,absv=True,sigma=sigma,N=swN,recenter=recenter,recenter_mode=recenter_mode)
                 else:
-                    rho1, support1 = shrinkwrap_by_density_value(rho1,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
-                    rho2, support2 = shrinkwrap_by_density_value(rho2,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+                    newrho, support = shrinkwrap_by_density_value(newrho,absv=True,sigma=sigma,threshold=threshold,recenter=recenter,recenter_mode=recenter_mode)
+
             #label the support into separate segments based on a 3x3x3 grid
             struct = ndimage.generate_binary_structure(3, 3)
             labeled_support, num_features = ndimage.label(support, structure=struct)
