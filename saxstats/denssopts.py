@@ -76,6 +76,8 @@ def parse_arguments(parser):
     parser.add_argument("--plot_off", dest="plot", action="store_false", help="Do not create simple plots of results. (Default if Matplotlib does not exist)")
     parser.add_argument("-q", "--quiet", action="store_true", help="Do not display running statistics. (default False)")
     parser.add_argument("-gpu", "--gpu", dest="DENSS_GPU", action="store_true", help="Use GPU acceleration (requires CuPy). (default False)")
+    parser.add_argument("-a", "--flag_a", type=str, dest = "flag_a", default = None, help= "Used for creating multiple density maps. Must be a .dat file. Must additionally include a flag b.")
+    parser.add_argument("-b", "--flag_b", type=str, dest = "flag_b", default = None, help = "Used for creating multiple density maps. Must be a .dat file. Must additionally include a flag a.")
     parser.set_defaults(shrinkwrap=None)
     parser.set_defaults(shrinkwrap_old_method=None)
     parser.set_defaults(recenter=None)

@@ -1,20 +1,19 @@
 import numpy as np
-import matplotlib.pyplot as plt #remember exit()
-from mpl_toolkits.mplot3d import Axes3D
 import saxstats.saxstats as saxs
 
 DENSS_GPU = False
 
-## Fake variables 
-rho = np.random.rand(64, 64, 64)
-qdata_file = saxs.loadDatFile('/Users/maijabalts/Desktop/BioXFEL/denss-master/6lyz.dat')
+## input variables 
+#qdata_file = saxs.loadDatFile('/Users/maijabalts/Desktop/BioXFEL/denss-master/6lyz.dat')
+qdata_file = saxs.loadDatFile('/Users/maijabalts/Desktop/BioXFEL/denss-master/SASDRX8/experimental_data/SASDRX8.dat') #Should have 2 
+
 q = qdata_file[0]
-I = qdata_file[1]
+I = qdata_file[1] #Why is I all NA when using fit
 sigq = qdata_file[2]
 
 ## Variable presets
 side = 3
-D = 50 #max density
+D = 100 #max density
 voxel = 5
 steps=2001
 shrinkwrap_sigma_start=3
@@ -48,12 +47,12 @@ V = side**3
 x_ = np.linspace(-halfside,halfside,n)
 x,y,z = np.meshgrid(x_,x_,x_,indexing='ij') #creating cartesian coordinates
 r = np.sqrt(x**2 + y**2 + z**2)
-
 df = 1/side
-qx_ = np.fft.fftfreq(x_.size)*n*df*2*np.pi #converting to frequency space
-qz_ = np.fft.rfftfreq(x_.size)*n*df*2*np.pi
+
+qx = np.fft.fftfreq(x_.size)*n*df*2*np.pi #converting to frequency space
+qz = np.fft.rfftfreq(x_.size)*n*df*2*np.pi
 # qx, qy, qz = np.meshgrid(qx_,qx_,qx_,indexing='ij')
-qx, qy, qz = np.meshgrid(qx_,qx_,qz_,indexing='ij') 
+qx, qy, qz = np.meshgrid(qx,qx,qz,indexing='ij') 
 qr = np.sqrt(qx**2+qy**2+qz**2) #radius from reciprocal box
 qmax = np.max(qr)
 qstep = np.min(qr[qr>0]) - 1e-8 #subtract a tiny bit to deal with floating point error
@@ -68,19 +67,16 @@ xcount = np.bincount(qblravel)
 
 #calculate qbinsc as average of q values in shell
 qbinsc = saxs.mybinmean(qr.ravel(), qblravel, xcount) 
-len(qbinsc)
 
 #allow for any range of q data
 qdata = qbinsc[np.where((qbinsc>=q.min()) & (qbinsc<=q.max()) )] #cuts qdata so that it's datapoints only fall within qmax and qmin. 
-len(qdata)
-Idata = np.interp(qdata,q,I)
-len(Idata)
+Idata = np.interp(qbinsc,q,I)
 
 #create list of qbin indices just in region of data for later F scaling
 qbin_args = np.in1d(qbinsc,qdata,assume_unique=True)
 qba = qbin_args #just for brevity when using it later
 
-sigqdata = np.interp(qdata,q,sigq)
+sigqdata = np.interp(qbinsc,q,sigq)
 
 Iq = np.column_stack((q, I, sigq)).T
 # Iq = np.vstack((self.q,self.I,self.Ierr)).T
@@ -106,14 +102,24 @@ rg = np.zeros((steps+1))
 supportV = np.zeros((steps+1))
 
 support = np.ones(x.shape,dtype=bool) #protein specific
-prng = np.random.RandomState()
-seed = prng.randint(2**31-1)
 
-prng = np.random.RandomState(seed)
+prng_0 = np.random.RandomState()
+prng_1 = np.random.RandomState()
+seed_0 = prng_0.randint(2**31-1)
+seed_1 = prng_1.randint(2**22-2)
 
-rho = prng.random_sample(size=x.shape) #- 0.5
-newrho = np.zeros_like(rho)
+prng_0 = np.random.RandomState(seed_0)
+prng_1 = np.random.RandomState(seed_1)
+
+#Create a new array. Random
+rho_null = prng_0.random_sample(size=x.shape) #- 0.5
+rho_one = prng_1.random_sample(size= x.shape)
+#newrho = np.zeros_like(rho) #for shrinkwraping
 sigma = shrinkwrap_sigma_start
+
+#Create support for null and 0
+support_null = np.ones(rho_null.shape,dtype=bool)
+support_one = np.ones(rho_one.shape,dtype=bool)
 
 swbyvol = True
 swV = V/2.0
@@ -124,41 +130,64 @@ first_time_swdensity = True
 threshold = shrinkwrap_threshold_fraction
 erosion_width = int(20/dx) #this is in pixels
 
-# if erosion_width ==0:
-#     #make minimum of one pixel
-#     erosion_width = 1
+## Run through F transformation
+F_null = saxs.myrfftn(rho_null) #structure factors
+F_null[np.abs(F_null)==0] = 1e-16 #setting anything that's 0 to almost 0
+F_one = saxs.myrfftn(rho_one)
+F_one[np.abs(F_one)==0] = 1e-16 #setting anything that's 0 to almost 0
 
-##Run through F transformation
-F = saxs.myrfftn(rho, DENSS_GPU=DENSS_GPU)
-F[np.abs(F)==0] = 1e-16 #setting anything that's 0 to almost 0
+#put together to create F_full
+F_full = F_null + F_one
 
-#Create F profile to compare
-I3D = saxs.abs2(F) #calculating intensity (magnitude squared)
+## Create F profile to compare
+I3D = saxs.abs2(F_full) #calculating intensity (magnitude squared)
 Imean = saxs.mybinmean(I3D.ravel(), qblravel) #creates profile THIS IS CORRECT
 #scale Fs to match data
-factors = saxs.mysqrt(Idata/Imean) ##issue with Idata and Imean matching
+factors = saxs.mysqrt(Idata/Imean) 
 
 #do not scale bins outside of desired range
 #so set those factors to 1.0
 Imean[~qba] = 1.0
-F *= factors[qbin_labels] 
-
-#This is the start of the new iteration
-rho_new = saxs.myirfftn(F)
-rho_new = rho_new.real
+# F_full *= factors[qbin_labels]  #scale F_null F_one
+F_null *= factors[qbin_labels]
+F_one *= factors[qbin_labels]
 
 #compare profiles
 chi= saxs.mysum(((Imean[qba]-Idata[qba])/sigqdata[qba])**2)/Idata[qba].size
 print(chi)
 
+# Apply real space constraints
+rho_null_new = saxs.myirfftn(F_null).real
+rho_one_new = saxs.myirfftn(F_one).real
+
+#Error Reduction/solvent flattening
+rho_null_z = np.zeros_like(rho_null)
+rho_null_z *= 0 
+rho_null_z[support_null] = rho_null_new[support_null] #zeroing everything outside of support
+
+rho_one_z = np.zeros_like(rho_one)
+rho_one_z *= 0 
+rho_one_z[support_one] = rho_one_new[support_one]
+
+#positivity
+rho_null_z[rho_null_z<0] = 0.0
+rho_one_z[rho_one_z<0] = 0.0
+
+rho_null = rho_null_z
+rho_one = rho_one_z
+
+#shrinkwrap
+absv = True
+rho_null, support_null = saxs.shrinkwrap_by_density_value(rho_null,absv=absv,sigma=sigma,threshold=threshold)
+sigma = shrinkwrap_sigma_decay*sigma
+#This is the start of the new iteration
+
+#Centering
+
 
 #checking code shape
-print(np.shape(rho))
-print(np.shape(rho_new))
-print(np.sum(rho - rho_new)) #Why are they the exact same?
-x, y, z = rho_new[:, :, 0].flatten(), rho_new[:, :, 1].flatten(), rho_new[:, :, 2].flatten()
-# Create a 3D scatter plot
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(x, y, z, c='b', marker='o')
-plt.show()
+
+fprefix = "Maija_test_null"
+mprefix = "Maija_test_one"
+saxs.write_mrc(rho_null, side, fprefix+".mrc")
+saxs.write_mrc(rho_one, side, mprefix+".mrc")

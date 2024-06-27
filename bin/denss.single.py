@@ -26,7 +26,7 @@
 
 from __future__ import print_function
 from saxstats._version import __version__
-import saxstats.saxstats as saxs
+import saxstats.saxstats_original as saxs
 import saxstats.denssopts as dopts
 import numpy as np
 import sys, argparse, os
@@ -36,18 +36,18 @@ parser = argparse.ArgumentParser(description="DENSS: DENsity from Solution Scatt
 args = dopts.parse_arguments(parser)
 
 if __name__ == "__main__":
-    __spec__ = None 
+    __spec__ = None
     my_logger = logging.getLogger()
-    my_logger.setLevel(logging.DEBUG) #configuring the logger to handle all messages at the DEBUG level and above. Logger tracks all "bugs"
+    my_logger.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter('%(asctime)s %(message)s', '%Y-%m-%d %I:%M:%S %p') #Gives timestamp to all things logged. 
+    formatter = logging.Formatter('%(asctime)s %(message)s', '%Y-%m-%d %I:%M:%S %p')
 
     # h1 = logging.StreamHandler(sys.stdout)
     # h1.setLevel(logging.INFO)
     # h1.setFormatter(formatter)
 
-    h2 = logging.FileHandler(os.path.join('.', args.output+'.log'), mode='w') #creating a variable h2 
-    h2.setLevel(logging.INFO) 
+    h2 = logging.FileHandler(os.path.join('.', args.output+'.log'), mode='w')
+    h2.setLevel(logging.INFO)
     h2.setFormatter(formatter)
 
     # my_logger.addHandler(h1)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     my_logger.info('Mode: %s', args.mode)
 
     qdata, Idata, sigqdata, qbinsc, Imean, chis, rg, supportV, rho, side, fit, final_chi2 = saxs.denss(
-        q=args.q, #assigning variables
+        q=args.q,
         I=args.I,
         sigq=args.sigq,
         dmax=args.dmax,
@@ -104,9 +104,9 @@ if __name__ == "__main__":
         DENSS_GPU=args.DENSS_GPU,
         my_logger=my_logger)
 
-    print("\n%s"%args.output) #printing the output of args. 
+    print("\n%s"%args.output)
 
-    if args.plot: #creating a plot
+    if args.plot:
         import matplotlib.pyplot as plt
         from  matplotlib.colors import colorConverter as cc
         import matplotlib.gridspec as gridspec

@@ -2,12 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt #remember exit()
 from mpl_toolkits.mplot3d import Axes3D
 import saxstats.saxstats as saxs
+from scipy import ndimage
 
 DENSS_GPU = False
 
 ## Fake variables 
-rho = np.random.rand(64, 64, 64)
-qdata_file = saxs.loadDatFile('/Users/maijabalts/Desktop/BioXFEL/denss-master/6lyz.dat')
+#rho = newrho
+#qdata_file = saxs.loadDatFile('/Users/maijabalts/Desktop/BioXFEL/denss-master/6lyz.dat')
+qdata_file = saxs.loadDatFile('chainB.dat')
 q = qdata_file[0]
 I = qdata_file[1]
 sigq = qdata_file[2]
@@ -72,9 +74,7 @@ len(qbinsc)
 
 #allow for any range of q data
 qdata = qbinsc[np.where((qbinsc>=q.min()) & (qbinsc<=q.max()) )] #cuts qdata so that it's datapoints only fall within qmax and qmin. 
-len(qdata)
 Idata = np.interp(qbinsc,q,I)
-len(Idata)
 
 #create list of qbin indices just in region of data for later F scaling
 qbin_args = np.in1d(qbinsc,qdata,assume_unique=True)
@@ -136,7 +136,7 @@ F[np.abs(F)==0] = 1e-16 #setting anything that's 0 to almost 0
 I3D = saxs.abs2(F) #calculating intensity (magnitude squared)
 Imean = saxs.mybinmean(I3D.ravel(), qblravel) #creates profile THIS IS CORRECT
 #scale Fs to match data
-factors = saxs.mysqrt(Idata/Imean) ##issue with Idata and Imean matching
+factors = saxs.mysqrt(Idata/Imean) ##ratio of data and expected
 
 #do not scale bins outside of desired range
 #so set those factors to 1.0
@@ -151,14 +151,50 @@ rho_new = rho_new.real
 chi= saxs.mysum(((Imean[qba]-Idata[qba])/sigqdata[qba])**2)/Idata[qba].size
 print(chi)
 
+#Solvent Flattening
+rho_z = np.zeros_like(rho)
+rho_z *= 0 
+rho_z[support] = rho_new[support] #zeroing everything outside of support
+rho_z[rho_z<0] = 0.0
+rho = rho_z
+
+#Shrinkwraping and erode 
+rho_total = np.copy(rho)
+newrhosym = np.copy(rho)
+degrees = 360./ncs
+for n in range(1,ncs):
+    sym = ndimage.rotate(newrhosym, degrees * n, axes = axes, reshape = True)
+    rho_total += np.copy(sym)
+
+rho = rho_total /ncs 
+
+swN = int(swV/dV)
+if swbyvol and swV > swVend:
+    rho, support, threshold = saxs.shrinkwrap_by_volume(rho, absv = True, sigma = sigma, N = swN)
+    swV *= swV_decay
+else: 
+    threshold = shrinkwrap_threshold_fraction
+    rho, support = saxs.shrinkwrap_by_density_value(rho, absv= True, sigma = sigma, threshold= threshold)
+
+if sigma > shrinkwrap_sigma_end:
+    sigma = shrinkwrap_sigma_decay*sigma
+
+#erosian 
+eroded = ndimage.binary_erosion(support,np.ones((erosion_width,erosion_width,erosion_width)))
+erode_region = np.logical_and(support,~eroded)
+rho[(rho<0)&(erode_region)] = 0
+
+
+#Recentering
+rhocom = np.unravel_index(rho.argmax(), rho.shape)   
+gridcenter = (np.array(rho.shape)-1.)/2.
+shift = gridcenter-rhocom
+shift = np.rint(shift).astype(int)
+rho = np.roll(np.roll(np.roll(rho, shift[0], axis=0), shift[1], axis=1), shift[2], axis=2)
+support = np.roll(np.roll(np.roll(support, shift[0], axis=0), shift[1], axis=1), shift[2], axis=2)
 
 #checking code shape
-print(np.shape(rho))
-print(np.shape(rho_new))
-print(np.sum(rho - rho_new)) #Why are they the exact same?
-x, y, z = rho_new[:, :, 0].flatten(), rho_new[:, :, 1].flatten(), rho_new[:, :, 2].flatten()
-# Create a 3D scatter plot
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(x, y, z, c='b', marker='o')
-plt.show()
+np.shape(rho)
+saxs.write_mrc(rho_new, side, "simple.mrc")
+
+#imshow

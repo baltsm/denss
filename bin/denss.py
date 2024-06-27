@@ -60,8 +60,8 @@ if __name__ == "__main__":
     my_logger.info('Output prefix: %s', args.output)
     my_logger.info('Mode: %s', args.mode)
 
-    qdata, Idata, sigqdata, qbinsc, Imean, chis, rg, supportV, rho, side, fit, final_chi2 = saxs.denss(
-        q=args.q, #assigning variables
+    qdata, Idata, sigqdata, qbinsc, Imean, chi, rg, supportV, rho_null, rho_one, side, fit, fit_a, fit_b, final_chi2, final_chi2_a, final_chi2_b = saxs.denss(
+        q=args.q, 
         I=args.I,
         sigq=args.sigq,
         dmax=args.dmax,
@@ -102,6 +102,8 @@ if __name__ == "__main__":
         cutout=args.cutout,
         quiet=args.quiet,
         DENSS_GPU=args.DENSS_GPU,
+        flag_a = args.flag_a,
+        flag_b = args.flag_b,
         my_logger=my_logger)
 
     print("\n%s"%args.output) #printing the output of args. 
@@ -162,7 +164,7 @@ if __name__ == "__main__":
         color2 = plt.cm.viridis(0.5)
         color3 = plt.cm.viridis(.9)
 
-        p1, = host.plot(chis[chis>0], color=color1,label="$\chi^2$")
+        p1, = host.plot(chi[chi>0], color=color1,label="$\chi^2$")
         p2, = par1.plot(rg[rg!=0], color=color2, label="Rg")
         p3, = par2.plot(supportV[supportV>0], color=color3, label="Support Volume")
 
@@ -181,6 +183,78 @@ if __name__ == "__main__":
 
         plt.savefig(args.output+'_stats_by_step.png', bbox_inches='tight',dpi=150)
         plt.close()
+
+    if args.plot: #creating a plot for A
+        import matplotlib.pyplot as plt
+        from  matplotlib.colors import colorConverter as cc
+        import matplotlib.gridspec as gridspec
+
+        f = plt.figure(figsize=[6,6])
+        fs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+
+        ax0 = plt.subplot(gs[0])
+        ax0.errorbar(fit_a[:,0], fit_a[:,1], fmt='k.', yerr=fit_a[:,2], mec='none', mew=0, ms=5, alpha=0.3, capsize=0, elinewidth=0.1, ecolor=cc.to_rgba('0',alpha=0.5),label='Supplied Data',zorder=-1)
+        ax0.plot(fit_a[:,0],fit_a[:,3],'r-',label=r'DENSS Map $\chi^2 = %.2f$'%final_chi2_a)
+
+        handles,labels = ax0.get_legend_handles_labels()
+        handles = [handles[1], handles[0] ]
+        labels = [labels[1], labels[0] ]
+        ax0.legend(handles,labels)
+        ax0.semilogy()
+        ax0.set_ylabel('I(q)')
+
+        ax1 = plt.subplot(gs[1])
+        ax1.plot(fit_a[:,0], fit_a[:,0]*0, 'k--')
+        residuals = (fit_a[:,1]-fit_a[:,3])/fit_a[:,2]
+        ax1.plot(fit_a[:,0], residuals, 'r.')
+        ylim = ax1.get_ylim()
+        ymax = np.max(np.abs(ylim))
+        ymax = np.max(np.abs(residuals))
+        ax1.set_ylim([-ymax,ymax])
+        ax1.yaxis.major.locator.set_params(nbins=5)
+        xlim = ax0.get_xlim()
+        ax1.set_xlim(xlim)
+        ax1.set_ylabel(r'$\Delta{I}/\sigma$')
+        ax1.set_xlabel(r'q ($\mathrm{\AA^{-1}}$)')
+        plt.tight_layout()
+        plt.savefig(args.output+'_fit_a.png',dpi=150)
+        plt.close()
+
+    if args.plot: #creating a plot for B
+        import matplotlib.pyplot as plt
+        from  matplotlib.colors import colorConverter as cc
+        import matplotlib.gridspec as gridspec
+
+        f = plt.figure(figsize=[6,6])
+        fs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+
+        ax0 = plt.subplot(gs[0])
+        ax0.errorbar(fit_b[:,0], fit_b[:,1], fmt='k.', yerr=fit_b[:,2], mec='none', mew=0, ms=5, alpha=0.3, capsize=0, elinewidth=0.1, ecolor=cc.to_rgba('0',alpha=0.5),label='Supplied Data',zorder=-1)
+        ax0.plot(fit_b[:,0],fit_b[:,3],'r-',label=r'DENSS Map $\chi^2 = %.2f$'%final_chi2_b)
+
+        handles,labels = ax0.get_legend_handles_labels()
+        handles = [handles[1], handles[0] ]
+        labels = [labels[1], labels[0] ]
+        ax0.legend(handles,labels)
+        ax0.semilogy()
+        ax0.set_ylabel('I(q)')
+
+        ax1 = plt.subplot(gs[1])
+        ax1.plot(fit_b[:,0], fit_b[:,0]*0, 'k--')
+        residuals = (fit_b[:,1]-fit_b[:,3])/fit_b[:,2]
+        ax1.plot(fit_b[:,0], residuals, 'r.')
+        ylim = ax1.get_ylim()
+        ymax = np.max(np.abs(ylim))
+        ymax = np.max(np.abs(residuals))
+        ax1.set_ylim([-ymax,ymax])
+        ax1.yaxis.major.locator.set_params(nbins=5)
+        xlim = ax0.get_xlim()
+        ax1.set_xlim(xlim)
+        ax1.set_ylabel(r'$\Delta{I}/\sigma$')
+        ax1.set_xlabel(r'q ($\mathrm{\AA^{-1}}$)')
+        plt.tight_layout()
+        plt.savefig(args.output+'_fit_b.png',dpi=150)
+        plt.close()    
 
     logging.info('END')
 

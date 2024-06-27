@@ -38,7 +38,7 @@ from __future__ import print_function, division, unicode_literals
 try:
     from builtins import object, range, map, zip, str
 except ImportError:
-    from __builtin__ import object, range, map, zip, strs
+    from __builtin__ import object, range, map, zip, str
 from io import open
 
 import sys
@@ -184,7 +184,7 @@ def abs2(x):
 #     for i in x:
 #         result[i] += weights[i]
 
-def mybinmean(xravel,binsravel,xcount=None,DENSS_GPU=False): #takes average of bins
+def mybinmean(xravel,binsravel,xcount=None,DENSS_GPU=False):
     if DENSS_GPU:
         xsum = cp.bincount(binsravel, xravel)
         if xcount is None:
@@ -196,13 +196,13 @@ def mybinmean(xravel,binsravel,xcount=None,DENSS_GPU=False): #takes average of b
             xcount = np.bincount(binsravel)
         return xsum/xcount
 
-def myones(x, DENSS_GPU=False): #creates an array of ones that is the same length of x
+def myones(x, DENSS_GPU=False):
     if DENSS_GPU:
         return cp.ones(x)
     else:
         return np.ones(x)
 
-def myzeros(x, DENSS_GPU=False): #creates an array of zeros WHERE ARE THESE STORED?
+def myzeros(x, DENSS_GPU=False):
     if DENSS_GPU:
         return cp.zeros(x)
     else:
@@ -353,7 +353,7 @@ def read_mrc(filename="map.mrc",returnABC=False,float64=True):
 
 def write_xplor(rho,side,filename="map.xplor"):
     """Write an XPLOR formatted electron density map."""
-    xs, ys, zs = rho.shape #assigning x,y,z to each respective part of rho.shape
+    xs, ys, zs = rho.shape
     title_lines = ['REMARK FILENAME="'+filename+'"','REMARK DATE= '+str(datetime.datetime.today())]
     with open(filename,'w') as f:
         f.write("\n")
@@ -377,7 +377,7 @@ def write_xplor(rho,side,filename="map.xplor"):
         f.write("  %.4E  %.4E" % (np.average(rho), np.std(rho)))
 
 def pad_rho(rho,newshape):
-    """Pad rho with zeros to achieve new shape""" #padding is when you change the size of an array
+    """Pad rho with zeros to achieve new shape"""
     a = rho
     a_nx,a_ny,a_nz = a.shape
     b_nx,b_ny,b_nz = newshape
@@ -390,7 +390,7 @@ def pad_rho(rho,newshape):
     #np.pad cannot take negative values, i.e. where the array will be cropped
     #however, can instead just use slicing to do the equivalent
     #but first need to identify which pad values are negative
-    slcx1, slcx2, slcy1, slcy2, slcz1, slcz2 = None, None, None, None, None, None #assigning variables all at once
+    slcx1, slcx2, slcy1, slcy2, slcz1, slcz2 = None, None, None, None, None, None
     if padx1 < 0:
         slcx1 = -padx1
         padx1 = 0
@@ -410,7 +410,7 @@ def pad_rho(rho,newshape):
         slcz2 = padz2
         padz2 = 0
     a = np.pad(a,((padx1,padx2),(pady1,pady2),(padz1,padz2)),'constant')[
-        slcx1:slcx2, slcy1:slcy2, slcz1:slcz2] #adds padding, looks for anything that is 0 and reduces the padding to anything NOT 0. 
+        slcx1:slcx2, slcy1:slcy2, slcz1:slcz2]
     return a
 
 def zoom_rho(rho,vx,dx):
@@ -666,7 +666,7 @@ def loadDatFile(filename):
                 err.append(float(found[2]))
             else:
                 found = line.split()
-                q.append(float(found[0])) #acesses first list within the q array
+                q.append(float(found[0]))
                 i.append(float(found[1]))
                 imodel.append(float(found[2]))
                 err.append(float(found[3]))
@@ -1004,7 +1004,7 @@ def estimate_dmax(Iq,dmax=None,clean_up=True):
         #next, dmax is roughly 3.5*rg for most particles
         #so calculate P(r) using a larger dmax, say twice as large, so 7*rg
         D = 7*rg
-    else: 
+    else:
         #allow user to give an initial estimate of Dmax
         #multiply by 2 to allow for enough large r values
         D = 2*dmax
@@ -1124,41 +1124,40 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
 
     fprefix = os.path.join(path, output)
 
-    D = dmax 
+    D = dmax
 
     #Initialize variables
 
-    side = oversampling*D #creating box size larger than protein
+    side = oversampling*D
     halfside = side/2
 
-    n = int(side/voxel) 
+    n = int(side/voxel)
     #want n to be even for speed/memory optimization with the FFT, ideally a power of 2, but wont enforce that
     if n%2==1:
         n += 1
     #store n for later use if needed
     nbox = n
 
-    dx = side/n #individual size of voxel
-    dV = dx**3 
+    dx = side/n
+    dV = dx**3
     V = side**3
     x_ = np.linspace(-halfside,halfside,n)
-    x,y,z = np.meshgrid(x_,x_,x_,indexing='ij') #creating cartesian coordinates
+    x,y,z = np.meshgrid(x_,x_,x_,indexing='ij')
     r = np.sqrt(x**2 + y**2 + z**2)
 
-    #All this is fourier space
     df = 1/side
-    qx_ = np.fft.fftfreq(x_.size)*n*df*2*np.pi #converting to frequency space
+    qx_ = np.fft.fftfreq(x_.size)*n*df*2*np.pi
     qz_ = np.fft.rfftfreq(x_.size)*n*df*2*np.pi
     # qx, qy, qz = np.meshgrid(qx_,qx_,qx_,indexing='ij')
-    qx, qy, qz = np.meshgrid(qx_,qx_,qz_,indexing='ij') 
-    qr = np.sqrt(qx**2+qy**2+qz**2) #radius from reciprocal box
+    qx, qy, qz = np.meshgrid(qx_,qx_,qz_,indexing='ij')
+    qr = np.sqrt(qx**2+qy**2+qz**2)
     qmax = np.max(qr)
     qstep = np.min(qr[qr>0]) - 1e-8 #subtract a tiny bit to deal with floating point error
     nbins = int(qmax/qstep)
-    qbins = np.linspace(0,nbins*qstep,nbins+1) #setting up for where you're scattering
+    qbins = np.linspace(0,nbins*qstep,nbins+1)
 
     #create an array labeling each voxel according to which qbin it belongs
-    qbin_labels = np.searchsorted(qbins,qr,"right") #labeling voxels
+    qbin_labels = np.searchsorted(qbins,qr,"right")
     qbin_labels -= 1
     qblravel = qbin_labels.ravel()
     xcount = np.bincount(qblravel)
@@ -1192,7 +1191,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
     I *= scale_factor
     sigq *= scale_factor
 
-    if steps == 'None' or steps is None or int(steps) < 1:
+    if steps == 'None' or steps is None or np.int(steps) < 1:
         stepsarr = np.concatenate((enforce_connectivity_steps,[shrinkwrap_minstep]))
         maxec = np.max(stepsarr)
         steps = int(shrinkwrap_iter * (np.log(shrinkwrap_sigma_end/shrinkwrap_sigma_start)/np.log(shrinkwrap_sigma_decay)) + maxec)
@@ -1201,7 +1200,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         #then just make a round number when using defaults
         steps += 7621
     else:
-        steps = int(steps)
+        steps = np.int(steps)
 
     Imean = np.zeros((len(qbins)))
     chi = np.zeros((steps+1))
@@ -1210,7 +1209,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
     if support_start is not None:
         support = np.copy(support_start)
     else:
-        support = np.ones(x.shape,dtype=bool) #protein specific
+        support = np.ones(x.shape,dtype=bool)
 
     if seed is None:
         #Have to reset the random seed to get a random in different from other processes
@@ -1348,14 +1347,14 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         qblravel = cp.array(qblravel)
         xcount = cp.array(xcount)
 
-    for j in range(steps): #iteration starts
+    for j in range(steps):
         if abort_event is not None:
             if abort_event.is_set():
                 my_logger.info('Aborted!')
                 return []
 
         # F = myfftn(rho, DENSS_GPU=DENSS_GPU)
-        F = myrfftn(rho, DENSS_GPU=DENSS_GPU) #calculates structure factors
+        F = myrfftn(rho, DENSS_GPU=DENSS_GPU)
 
         #sometimes, when using denss.refine.py with non-random starting rho,
         #the resulting Fs result in zeros in some locations and the algorithm to break
@@ -1365,28 +1364,28 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         #APPLY RECIPROCAL SPACE RESTRAINTS
         #calculate spherical average of intensities from 3D Fs
         # I3D = myabs(F, DENSS_GPU=DENSS_GPU)**2
-        I3D = abs2(F) #calculating intensity (magnitude squared)
-        Imean = mybinmean(I3D.ravel(), qblravel, xcount=xcount, DENSS_GPU=DENSS_GPU) #creates profile
+        I3D = abs2(F)
+        Imean = mybinmean(I3D.ravel(), qblravel, xcount=xcount, DENSS_GPU=DENSS_GPU)
 
         #scale Fs to match data
         factors = mysqrt(Idata/Imean, DENSS_GPU=DENSS_GPU)
         #do not scale bins outside of desired range
         #so set those factors to 1.0
         factors[~qba] = 1.0
-        F *= factors[qbin_labels] 
+        F *= factors[qbin_labels]
 
         chi[j] = mysum(((Imean[qba]-Idata[qba])/sigqdata[qba])**2, DENSS_GPU=DENSS_GPU)/Idata[qba].size
 
         #APPLY REAL SPACE RESTRAINTS
         # rhoprime = myifftn(F, DENSS_GPU=DENSS_GPU).real
-        rhoprime = myirfftn(F, DENSS_GPU=DENSS_GPU).real #calculating new desnity map
+        rhoprime = myirfftn(F, DENSS_GPU=DENSS_GPU).real
 
         # use Guinier's law to approximate quickly
         rg[j] = calc_rg_by_guinier_first_2_points(qbinsc, Imean, DENSS_GPU=DENSS_GPU)
 
-        #Error Reduction/solvent flattening
-        newrho *= 0 
-        newrho[support] = rhoprime[support] #zeroing everything outside of support
+        #Error Reduction
+        newrho *= 0
+        newrho[support] = rhoprime[support]
 
         if not DENSS_GPU and j%write_freq == 0:
             if write_xplor_format:
@@ -2407,6 +2406,14 @@ def sigmoid_find_x_value_given_y(y, x0, k, b, L):
     x = -1/k * np.log(L/(y-b)-1)+x0
     return x
 
+def create_lowq(q):
+    """Create a calculated q range for Sasrec for low q out to q=0.
+    Just the q values, not any extrapolation of intensities."""
+    dq = (q.max()-q.min())/(q.size-1)
+    nq = int(q.min()/dq)
+    qc = np.concatenate(([0.0],np.arange(nq)*dq+(q.min()-nq*dq),q))
+    return qc
+
 class Sasrec(object):
     def __init__(self, Iq, D, qc=None, r=None, nr=None, alpha=0.0, ne=2, extrapolate=True):
         self.Iq = Iq
@@ -2421,8 +2428,7 @@ class Sasrec(object):
         self.Ierr_data = np.copy(self.Ierr)
         self.nq_data = len(self.q_data)
         if qc is None:
-            #self.qc = self.q
-            self.create_lowq()
+            self.qc = create_lowq(self.q)
         else:
             self.qc = qc
         if extrapolate:
@@ -3063,8 +3069,16 @@ class PDB(object):
                     atomtype = atomtype0 + atomtype1
                 if len(atomtype) == 0:
                     #if atomtype column is not in pdb file, set to first
-                    #character of atomname
+                    #character of atomname that is in the database of elements
+                    #(sometimes a number is the first character)
+                    #otherwise default to Carbon
                     atomtype = self.atomname[atom][0]
+                    if atomtype not in ffcoeff:
+                        atomtype = self.atomname[atom][1]
+                    if atomtype not in ffcoeff:
+                        print("%s atomtype not recognized for atom number %s"%(atomtype, self.atomnum[atom]))
+                        print("Setting atomtype to default Carbon.")
+                        atomtype = "C"
                 self.atomtype[atom] = atomtype
                 self.charge[atom] = line[78:80].strip('\n')
                 self.nelectrons[atom] = electrons.get(self.atomtype[atom].upper(),6)
