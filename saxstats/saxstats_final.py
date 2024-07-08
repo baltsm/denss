@@ -1119,18 +1119,9 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         I_one = qdata_one[1] 
         sigq_one = qdata_one[2]
 
-        Iq_null = np.column_stack((q_null, I_null, sigq_null)).T
-        ne_null = Iq_null.shape[0] #number of electrons
-
-        Iq_one = np.column_stack((q_one, I_one, sigq_one)).T
-        ne_one = Iq_one.shape[0] #number of electrons
         flags = True
     else: 
         flags = False
-        Iq = np.column_stack((q, I, sigq)).T
-        ne_null = Iq.shape[0]/2
-        ne_one = Iq.shape[0]/2
-        #print(ne_null)
         
 
     if abort_event is not None:
@@ -1472,7 +1463,9 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
         newrho_one *= 0
         newrho_null[support_null] = rhoprime_null[support_null] #zeroing everything outside of support
         newrho_one[support_one] = rhoprime_one[support_one]
-    
+        support_null[support_one] = False
+        support_one[support_null] = False
+        
     
         if not DENSS_GPU and j%write_freq == 0:
             if write_xplor_format:
@@ -1587,9 +1580,9 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
             full_gridcenter = (np.array(rho_full.shape)-1.)/2.
             full_shift = full_gridcenter-rho_fullcom
             full_shift = np.rint(full_shift).astype(int)
-            newrho_null = np.roll(np.roll(np.roll(newrho_null, -full_shift[0], axis=0), -full_shift[1], axis=1), -full_shift[2], axis=2)
+            newrho_null = np.roll(np.roll(np.roll(newrho_null, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
             newrho_one = np.roll(np.roll(np.roll(newrho_one, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
-            support_null = np.roll(np.roll(np.roll(support_null, -full_shift[0], axis=0), -full_shift[1], axis=1), -full_shift[2], axis=2)
+            support_null = np.roll(np.roll(np.roll(support_null, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
             support_one = np.roll(np.roll(np.roll(support_one, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
 
             if DENSS_GPU:
@@ -1658,10 +1651,6 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
                 newrho = cp.array(newrho)
                 support = cp.array(support)
 
-            if j % 200 < 100: 
-                support_null[support_one] = False
-                support_one[support_null] = False    
-
         if enforce_connectivity and j in enforce_connectivity_steps:
             if DENSS_GPU:
                 newrho = cp.asnumpy(newrho)
@@ -1699,7 +1688,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
                     print("EC Null: %d -> %d " % (num_features_null,num_features_to_keep_null))
                     print("EC One: %d -> %d " % (num_features_one,num_features_to_keep_one))
             #find the feature with the greatest number of electrons
-            for f0 in range(  +1):
+            for f0 in range(num_features_null +1):
                 sums_null[f0 - 1] = np.sum(rho_null[labeled_support_null == f0])
             big_feature_null = np.argmax(sums_null)+1
 
@@ -1738,10 +1727,6 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
                 newrho = cp.array(newrho)
                 support = cp.array(support)
 
-            if j % 200 < 100: 
-                support_null[support_one] = False
-                support_one[support_null] = False
-
         supportV[j] = mysum(support_null, DENSS_GPU=DENSS_GPU)*dV
 
         if not quiet:
@@ -1764,30 +1749,7 @@ def denss(q, I, sigq, dmax, qraw=None, Iraw=None, sigqraw=None,
             if lesser:
                 break
 
-        # if j in ncs_steps and j % 200 == 0: 
-        #     support_null[support_one] = False
-        #     support_one[support_null] = False
-        if flags == False:
-            # Scale electrons
-            if j in ncs_steps: 
-                newrho_null *= (ne_null) / np.sum(newrho_null)
-                newrho_one *= (ne_one) / np.sum(newrho_one)
-
-        # if flags:
-        #     scale_factor_null = ne_null**2 / Idata_null[0]
-        #     Idata_null *= scale_factor_null
-        #     sigqdata_null *= scale_factor_null
-        #     I_null *= scale_factor_null
-        #     sigq_null *= scale_factor_null 
-
-        #     scale_factor_one = ne_one**2 / Idata_one[0]
-        #     Idata_one *= scale_factor_one
-        #     sigqdata_one *= scale_factor_one
-        #     I_one *= scale_factor_one
-        #     sigq_one *= scale_factor_one     
-
-
-
+       
         rho_null = newrho_null
         rho_one = newrho_one
 

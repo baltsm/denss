@@ -5,8 +5,8 @@ DENSS_GPU = False
 
 qdata_file = saxs.loadDatFile('model1.dat') 
 #Null = a, One = b
-qdata_null = saxs.loadDatFile("chainA.dat")
-qdata_one = saxs.loadDatFile("chainB.dat")
+qdata_null = saxs.loadDatFile("ChainA.dat")
+qdata_one = saxs.loadDatFile("ChainB.dat")
 
 q = qdata_file[0]
 I = qdata_file[1] 
@@ -115,6 +115,8 @@ if erosion_width ==0:
 
 Imean = np.zeros((len(qbins)))
 chi = np.zeros((steps+1))
+chi_null = np.zeros((steps+1))
+chi_one = np.zeros((steps+1))
 chiV = np.inf
 rg = np.zeros((steps+1))
 supportV = np.zeros((steps+1))
@@ -125,15 +127,15 @@ seed_0 = prng_0.randint(2**31-1)
 seed_1 = prng_1.randint(2**31-1)
 
 prng_0 = np.random.RandomState(seed_0)
-prng_1 = np.random.RandomState(seed_1)
+prng_1 = np.random.RandomState(seed_0)
 
 #Create a new array. Random
 rho_null = prng_0.random_sample(size=x.shape) #- 0.5
-rho_one = prng_1.random_sample(size=x.shape)
+rho_one = np.copy(rho_null) #Change this back
+# rho_one = prng_0.random_sample(size=x.shape)
 #newrho = np.zeros_like(rho) #for shrinkwraping
 sigma_null = shrinkwrap_sigma_start
 sigma_one = shrinkwrap_sigma_start
-sigma = shrinkwrap_sigma_start
 
 #Create support for null and 0
 support_null = np.ones(rho_null.shape,dtype=bool)
@@ -164,21 +166,22 @@ rho_fullcom = (gridcenter_null-com_null)*dx
 
 
 ## Start For Loop
-loop = 1000
+loop = 1
 for i in range(loop):
     ## Run through F transformation
     F_null = saxs.myrfftn(rho_null) #structure factors
     F_null[np.abs(F_null)==0] = 1e-16 #setting anything that's 0 to almost 0
-    F_one = saxs.myrfftn(rho_one) #Why is this negative?
+    F_one = saxs.myrfftn(rho_one) 
     F_one[np.abs(F_one)==0] = 1e-16 #setting anything that's 0 to almost 0
 
     #add together to create F_full
     F_full = F_null + F_one
 
     ## Create F profile to compare
-    I3D = saxs.abs2(F_full) #calculating intensity (magnitude squared) #Create two of these
     I3D_null = saxs.abs2(F_null)
     I3D_one = saxs.abs2(F_one)
+    I3D = saxs.abs2(F_full) #calculating intensity (magnitude squared) #Create two of these
+
 
     Imean = saxs.mybinmean(I3D.ravel(), qblravel) #creates profile THIS IS CORRECT
     Imean_null = saxs.mybinmean(I3D_null.ravel(), qblravel)
@@ -192,7 +195,7 @@ for i in range(loop):
 
     #do not scale bins outside of desired range
     #so set those factors to 1.0
-    factors[~qba] = 1.0
+    # factors[~qba] = 1.0
     factors_null[~qba] = 1.0
     factors_one[~qba] = 1.0
     
@@ -204,14 +207,16 @@ for i in range(loop):
 
     #compare profiles
     chi[i]= saxs.mysum(((Imean[qba]-Idata[qba])/sigqdata[qba])**2)/Idata[qba].size
+    chi_null[i]= saxs.mysum(((Imean_null[qba]-Idata_null[qba])/sigqdata_null[qba])**2)/Idata_null[qba].size
+    chi_one[i]= saxs.mysum(((Imean_one[qba]-Idata_one[qba])/sigqdata_one[qba])**2)/Idata_one[qba].size
 
     counter += 1
-    print(f"Chi: {chi[i]}, Counter: {counter}")
+    print(f"Chi: {chi[i]}, Chi Diff: {chi_null[i] - chi_one[i]}, Counter: {counter}")
 
     # Apply real space constraints
     rho_null_new = saxs.myirfftn(F_null).real
     rho_one_new = saxs.myirfftn(F_one).real
-
+    
     #Error Reduction/solvent flattening
     rho_null_z = np.zeros_like(rho_null)
     rho_null_z *= 0 
@@ -226,63 +231,13 @@ for i in range(loop):
     rho_null[rho_null<0] = 0.0
     rho_one[rho_one<0] = 0.0
 
-#shrinkwrap
-    # if counter > 600:
-    #     # swN = int(swV/dV)
-    #     # if swbyvol and swV > swVend:
-    #     # These aren't doing anythign? 
-    #     new_rho_null, support_null, threshold_null = saxs.shrinkwrap_by_volume(rho_null, absv = True, sigma = sigma, N = swN)
-    #     new_rho_one, support_one, threshold_one = saxs.shrinkwrap_by_volume(rho_one, absv = True, sigma = sigma, N = swN)
-    #     # threshold_null = shrinkwrap_threshold_fraction #This isn't doing anything lol
-    #     # threshold_one = shrinkwrap_threshold_fraction
-    #     # rho_null = new_rho_null
-    #     # rho_one = new_rho_one
-
-    #     struct_null = ndimage.generate_binary_structure(3, 3)
-    #     struct_one = ndimage.generate_binary_structure(3,3)
-    #     labeled_support_null, num_features_null = ndimage.label(support_null, structure=struct_null)
-    #     labeled_support_one, num_features_one = ndimage.label(support_one, structure=struct_one)        
-    #     sums_null = np.zeros((num_features_null))
-    #     sums_one = np.zeros((num_features_one))
-    #     num_features_to_keep_null = np.min([num_features_null,enforce_connectivity_max_features])
-    #     num_features_to_keep_one = np.min([num_features_null, enforce_connectivity_max_features])
-
-    #     for f0 in range(num_features_null +1):
-    #         sums_null[f0 - 1] = np.sum(rho_null[labeled_support_null == f0])
-
-    #     for f1 in range(num_features_one + 1):
-    #         sums_one[f1 - 1] = np.sum(rho_one[labeled_support_one == f1])
-
-    #     big_feature_null = np.argmax(sums_null) + 1
-    #     big_feature_one = np.argmax(sums_one) + 1
-
-    #     sums_order_null = np.argsort(sums_null)[::-1]
-    #     sums_order_one = np.argsort(sums_one)[::-1]
-
-    #     sums_sorted_null = sums_null[sums_order_null]
-    #     sums_sorted_one = sums_one[sums_order_one]
-
-    #     features_sorted_null = sums_order_null+ 1
-    #     features_sorted_one = sums_order_one + 1
-
-    #     support_null *= False
-    #     support_one *= False
-
-    #     for f0 in range(num_features_to_keep_null):
-    #         support_null[labeled_support_null == features_sorted_null[f0]] = True
-    #     for f1 in range(num_features_to_keep_one):
-    #         support_one[labeled_support_one == features_sorted_one[f1]] = True
-
-    #     rho_null[~support_null] = 0
-    #     rho_one[~support_one] = 0
-
     #Shrinkwrap OLD
     if counter > 600 and counter % 20 == 0:
         absv = True
         # sigma_null = shrinkwrap_sigma_decay*sigma_null
         # sigma_one = shrinkwrap_sigma_decay*sigma_one #These will be the same
-        rho_null_new, support_null = saxs.shrinkwrap_by_density_value(rho_null,absv=absv,sigma=sigma,threshold=threshold_null)
-        rho_one_new, support_one = saxs.shrinkwrap_by_density_value(rho_one,absv=absv,sigma=sigma,threshold=threshold_one)
+        rho_null_new, support_null = saxs.shrinkwrap_by_density_value(rho_null,absv=absv,sigma=sigma_null,threshold=threshold_null)
+        rho_one_new, support_one = saxs.shrinkwrap_by_density_value(rho_one,absv=absv,sigma=sigma_one,threshold=threshold_one)
         rho_null = rho_null_new
         rho_one = rho_one_new
 
@@ -298,6 +253,7 @@ for i in range(loop):
         rho_one = np.roll(np.roll(np.roll(rho_one, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
         support_null = np.roll(np.roll(np.roll(support_null, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
         support_one = np.roll(np.roll(np.roll(support_one, full_shift[0], axis=0), full_shift[1], axis=1), full_shift[2], axis=2)
+
 
  #Write output files
 qraw = q
